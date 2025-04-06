@@ -1,18 +1,31 @@
 {
   "name": "crudkit",
+  "homepage": "https://crudkit-docs.vercel.app/",
+  "private": false,
   "version": "0.1.0",
   "description": "Automate CRUD operations with Drizzle, tRPC, and React Query",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
   "files": ["dist", "README.md"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/growupanand/crudkit.git",
+    "directory": "packages/crudkit"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
     "clean": "rm -rf dist"
   },
   "keywords": ["crud", "drizzle", "trpc", "react-query", "typescript"],
-  "author": "Your Name",
+  "author": {
+    "name": "Utkarsh Anand",
+    "email": "growupanand@gmail.com"
+  },
   "license": "MIT",
   "peerDependencies": {
     "@trpc/client": ">=10.0.0",
