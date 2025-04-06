@@ -14,7 +14,8 @@
     "declarationDir": "dist",
     "skipLibCheck": true,
     "jsx": "react",
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "disableSizeLimit": true
   },
   "include": ["src"],
   "exclude": ["node_modules", "dist"]
