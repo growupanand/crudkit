@@ -1,9 +1,11 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
-    "module": "ESNext",
+    "target": "es2020", // Use a modern target
+    "module": "esnext", // Use ESM for better tree-shaking
+    "moduleResolution": "node", // Or "bundler" for newer TypeScript versions
+    "skipLibCheck": true, // Skip type checking of declaration files
+    "isolatedModules": true, // Enable for faster builds
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    "moduleResolution": "node",
     "esModuleInterop": true,
     "strict": true,
     "noImplicitAny": true,
@@ -12,7 +14,6 @@
     "outDir": "dist",
     "declaration": true,
     "declarationDir": "dist",
-    "skipLibCheck": true,
     "jsx": "react",
     "forceConsistentCasingInFileNames": true,
     "disableSizeLimit": true
