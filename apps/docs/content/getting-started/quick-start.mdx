@@ -1,0 +1,117 @@
+---
+title: "Quick Start"
+description: "Get started with CrudKit in minutes."
+---
+
+# Quick Start
+
+This quick start guide will show you how to set up CrudKit with a simple example. We'll create a basic users CRUD API using Drizzle ORM, tRPC, and React Query.
+
+## Setting Up Your Schema
+
+First, define your database schema using Drizzle:
+
+```typescript
+// schema.ts
+import { pgTable, serial, text, timestamp } from 'drizzle-orm/pg-core';
+
+export const users = pgTable('users', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  email: text('email').notNull().unique(),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+```
+
+## Create the tRPC Router
+
+Next, use CrudKit to generate a tRPC router for your schema:
+
+```typescript
+// api/routers/users.ts
+import { createTRPCRouter, publicProcedure, protectedProcedure } from '../trpc';
+import { generateRouter } from 'crudkit';
+import { db } from '../db';
+import { users } from '../schema';
+
+export const usersRouter = generateRouter(
+  {
+    table: users,
+  },
+  {
+    createTRPCRouter,
+    publicProcedure,
+    protectedProcedure,
+  }
+);
+
+// Merge with your main router
+// api/root.ts
+import { createTRPCRouter } from './trpc';
+import { usersRouter } from './routers/users';
+
+export const appRouter = createTRPCRouter({
+  users: usersRouter,
+});
+
+export type AppRouter = typeof appRouter;
+```
+
+## Generate React Query Hooks
+
+Now you can generate React Query hooks to use in your frontend components:
+
+```typescript
+// hooks/use-users.ts
+import { generateReactQueryHooks } from 'crudkit';
+import { trpc } from '../utils/trpc';
+import { users } from '../schema';
+
+export const useUsers = generateReactQueryHooks(
+  {
+    routerPath: 'users',
+  },
+  trpc
+);
+```
+
+## Using the Hooks in a Component
+
+Finally, use the generated hooks in your React components:
+
+```tsx
+// components/UsersList.tsx
+import { useUsers } from '../hooks/use-users';
+
+export function UsersList() {
+  const { data, isLoading } = useUsers.useGetAll();
+  const { create, isLoading: isCreating } = useUsers.useCreate();
+
+  const handleCreateUser = () => {
+    create({
+      name: 'John Doe',
+      email: 'john@example.com',
+    });
+  };
+
+  if (isLoading) return <div>Loading...</div>;
+
+  return (
+    <div>
+      <h1>Users</h1>
+      <button onClick={handleCreateUser} disabled={isCreating}>
+        Add User
+      </button>
+      <ul>
+        {data?.map((user) => (
+          <li key={user.id}>{user.name} - {user.email}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+```
+
+## Next Steps
+
+Congratulations! You've set up a basic CRUD application with CrudKit. Check out the [Basic Usage](/guides/basic-usage) guide for more detailed examples and best practices.

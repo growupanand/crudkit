@@ -1,0 +1,181 @@
+---
+title: "Basic Usage"
+description: "Learn how to use CrudKit for basic CRUD operations."
+---
+
+# Basic Usage
+
+This guide will walk you through the basic usage patterns of CrudKit, showing you how to implement common CRUD operations with Drizzle, tRPC, and React Query.
+
+## Setting Up Your Schema
+
+The first step in using CrudKit is to define your database schema using Drizzle:
+
+```typescript
+// schema.ts
+import { pgTable, serial, text, varchar, timestamp } from 'drizzle-orm/pg-core';
+
+export const products = pgTable('products', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  description: text('description'),
+  sku: varchar('sku', { length: 50 }).notNull().unique(),
+  price: numeric('price', { precision: 10, scale: 2 }).notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at'),
+});
+```
+
+## Creating a tRPC Router
+
+Next, use the `generateRouter` function to create a tRPC router for your schema:
+
+```typescript
+// api/routers/products.ts
+import { createTRPCRouter, publicProcedure, protectedProcedure } from '../trpc';
+import { generateRouter } from 'crudkit';
+import { db } from '../db';
+import { products } from '../schema';
+
+export const productsRouter = generateRouter(
+  {
+    table: products,
+    // Optional: customize specific operations
+    customProcedures: {
+      // Add a custom search procedure
+      search: publicProcedure
+        .input(z.object({ query: z.string() }))
+        .query(async ({ input, ctx }) => {
+          return await ctx.db
+            .select()
+            .from(products)
+            .where(like(products.name, `%${input.query}%`))
+            .limit(10);
+        }),
+    },
+  },
+  {
+    createTRPCRouter,
+    publicProcedure,
+    protectedProcedure,
+  }
+);
+```
+
+## Setting Up React Query Hooks
+
+Generate hooks for your frontend with `generateReactQueryHooks`:
+
+```typescript
+// hooks/use-products.ts
+import { generateReactQueryHooks } from 'crudkit';
+import { trpc } from '../utils/trpc';
+import { products } from '../schema';
+
+export const useProducts = generateReactQueryHooks(
+  {
+    routerPath: 'products',
+  },
+  trpc
+);
+```
+
+## Using the Hooks in Components
+
+### Creating a Product
+
+```tsx
+// components/CreateProduct.tsx
+import { useState } from 'react';
+import { useProducts } from '../hooks/use-products';
+
+export function CreateProduct() {
+  const [product, setProduct] = useState({
+    name: '',
+    description: '',
+    sku: '',
+    price: '',
+  });
+  
+  const { create, isLoading, error } = useProducts.useCreate();
+  
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    create({
+      ...product,
+      price: parseFloat(product.price),
+    });
+  };
+  
+  return (
+    <form onSubmit={handleSubmit}>
+      <h2>Add New Product</h2>
+      
+      <div>
+        <label htmlFor="name">Name</label>
+        <input
+          id="name"
+          value={product.name}
+          onChange={(e) => setProduct({ ...product, name: e.target.value })}
+          required
+        />
+      </div>
+      
+      {/* Add other form fields */}
+      
+      <button type="submit" disabled={isLoading}>
+        {isLoading ? 'Adding...' : 'Add Product'}
+      </button>
+      
+      {error && <p className="error">{error.message}</p>}
+    </form>
+  );
+}
+```
+
+### Displaying Products
+
+```tsx
+// components/ProductsList.tsx
+import { useProducts } from '../hooks/use-products';
+
+export function ProductsList() {
+  const { data, isLoading, error } = useProducts.useGetAll();
+  
+  if (isLoading) return <div>Loading products...</div>;
+  if (error) return <div>Error: {error.message}</div>;
+  
+  return (
+    <div>
+      <h2>Products</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>SKU</th>
+            <th>Price</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data?.map((product) => (
+            <tr key={product.id}>
+              <td>{product.name}</td>
+              <td>{product.sku}</td>
+              <td>${product.price}</td>
+              <td>
+                <button>Edit</button>
+                <button>Delete</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+```
+
+## Next Steps
+
+In the [Advanced Usage](/guides/advanced-usage) guide, we'll explore more complex scenarios like custom validation, relationships between tables, and optimizing performance.

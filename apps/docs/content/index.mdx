@@ -1,0 +1,48 @@
+---
+title: CrudKit - Automate CRUD Operations
+---
+
+# CrudKit
+
+CrudKit is a powerful library that automates CRUD operations with Drizzle, tRPC, and React Query.
+
+## Features
+
+- 🚀 **Simplified CRUD Operations** - Automate repetitive CRUD logic
+- 🔄 **tRPC Integration** - Seamless type-safe API with tRPC
+- ⚡ **React Query Support** - Efficient data fetching and caching
+- 🛠️ **Drizzle ORM** - Type-safe SQL query builder
+- 📊 **Zod Validation** - Runtime type checking and validation
+
+## Quick Links
+
+- [Getting Started](/getting-started/installation)
+- [Basic Usage](/guides/basic-usage)
+- [API Reference](/api/schema)
+- [Examples](/examples/basic-crud)
+
+## Installation
+
+```bash
+npm install crudkit
+# or
+yarn add crudkit
+# or
+pnpm add crudkit
+```
+
+## Simple Example
+
+```tsx
+import { createCrud } from 'crudkit';
+import { db } from './db';
+import { users } from './schema';
+
+const usersCrud = createCrud({
+  table: users,
+  db: db,
+});
+
+// Now you can use usersCrud in your tRPC router
+```
+```

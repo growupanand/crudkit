@@ -1,0 +1,119 @@
+---
+title: "tRPC Integration"
+description: "Documentation for CrudKit's tRPC router generation."
+---
+
+# tRPC Integration
+
+CrudKit provides a powerful function to generate type-safe tRPC routers for your Drizzle tables.
+
+## `generateRouter`
+
+The `generateRouter` function creates a tRPC router with standard CRUD operations for a Drizzle table.
+
+### Signature
+
+```typescript
+function generateRouter<
+  TTable extends Table,
+  TContext extends { db: ReturnType<typeof drizzle> },
+  TTrpc
+>(
+  config: RouterConfig<TTable>,
+  helpers: {
+    createTRPCRouter: TTrpc["router"];
+    publicProcedure: TTrpc["procedure"];
+    protectedProcedure: TTrpc["procedure"];
+  }
+): ReturnType<TTrpc["router"]>
+```
+
+### Parameters
+
+- `config`: A configuration object with the following properties:
+  - `table`: A Drizzle ORM table instance
+  - `customProcedures` (optional): Additional tRPC procedures to include in the router
+  
+- `helpers`: An object with the following properties:
+  - `createTRPCRouter`: Function to create a tRPC router
+  - `publicProcedure`: tRPC procedure that doesn't require authentication
+  - `protectedProcedure`: tRPC procedure that requires authentication
+
+### Returns
+
+A tRPC router with the following endpoints:
+
+- `create`: Creates a new record
+- `getAll`: Retrieves all records
+- `getById`: Retrieves a record by ID
+- `update`: Updates a record (full replacement)
+- `patch`: Updates a record (partial update)
+- `delete`: Deletes a record
+
+### Example
+
+```typescript
+import { createTRPCRouter, publicProcedure, protectedProcedure } from '../trpc';
+import { generateRouter } from 'crudkit';
+import { db } from '../db';
+import { users } from '../schema';
+
+export const usersRouter = generateRouter(
+  {
+    table: users,
+  },
+  {
+    createTRPCRouter,
+    publicProcedure,
+    protectedProcedure,
+  }
+);
+```
+
+## Authentication
+
+By default, CrudKit configures the following authentication levels for the CRUD operations:
+
+- Public (no auth required):
+  - `getAll`
+  - `getById`
+  
+- Protected (auth required):
+  - `create`
+  - `update`
+  - `patch`
+  - `delete`
+
+## Custom Procedures
+
+You can add custom procedures to your router:
+
+```typescript
+export const usersRouter = generateRouter(
+  {
+    table: users,
+    customProcedures: {
+      search: publicProcedure
+        .input(z.object({ query: z.string() }))
+        .query(async ({ input, ctx }) => {
+          return await ctx.db
+            .select()
+            .from(users)
+            .where(like(users.name, `%${input.query}%`))
+            .limit(10);
+        }),
+      
+      countActive: publicProcedure
+        .query(async ({ ctx }) => {
+          const result = await ctx.db
+            .select({ count: sql`count(*)` })
+            .from(users)
+            .where(eq(users.status, 'active'));
+          
+          return result[0].count;
+        }),
+    },
+  },
+  helpers
+);
+```

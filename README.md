@@ -1,84 +1,96 @@
-# Turborepo starter
+# CrudKit
 
-This Turborepo starter is maintained by the Turborepo core team.
+CrudKit is a powerful library that automates CRUD (Create, Read, Update, Delete) operations with Drizzle ORM, tRPC, and React Query.
 
-## Using this example
+## Features
 
-Run the following command:
+- 🚀 **Simplified CRUD Operations** - Automate repetitive CRUD logic
+- 🔄 **tRPC Integration** - Seamless type-safe API with tRPC
+- ⚡ **React Query Support** - Efficient data fetching and caching
+- 🛠️ **Drizzle ORM** - Type-safe SQL query builder
+- 📊 **Zod Validation** - Runtime type checking and validation
 
-```sh
-npx create-turbo@latest
+## Installation
+
+```bash
+npm install crudkit
+# or
+yarn add crudkit
+# or
+pnpm add crudkit
 ```
 
-## What's inside?
+## Quick Example
 
-This Turborepo includes the following packages/apps:
+```tsx
+import { createCrud } from 'crudkit';
+import { db } from './db';
+import { users } from './schema';
 
-### Apps and Packages
+const usersCrud = createCrud({
+  table: users,
+  db: db,
+});
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
-
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-```
-cd my-turborepo
-pnpm build
+// Now you can use usersCrud in your tRPC router
 ```
 
-### Develop
+## Documentation
 
-To develop all apps and packages, run the following command:
+Full documentation is available at [docs.crudkit.dev](https://docs.crudkit.dev) with guides on:
 
+- [Installation](https://docs.crudkit.dev/getting-started/installation)
+- [Quick Start](https://docs.crudkit.dev/getting-started/quick-start)
+- [Basic Usage](https://docs.crudkit.dev/guides/basic-usage)
+- [API Reference](https://docs.crudkit.dev/api/schema)
+- [Examples](https://docs.crudkit.dev/examples/basic-crud)
+
+## Repository Structure
+
+This repository is a Turborepo monorepo with the following structure:
+
+- `apps/docs`: Documentation site built with Next.js and Nextra
+- `apps/web`: Demo application showcasing CrudKit usage
+- `packages/crudkit`: Core library package
+
+## Development
+
+### Prerequisites
+
+- Node.js 18+
+- pnpm (recommended)
+
+### Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/growupanand/crudkit.git
+cd crudkit
+
+# Install dependencies
+pnpm install
 ```
-cd my-turborepo
+
+### Development Commands
+
+```bash
+# Run development server for all packages
 pnpm dev
+
+# Run docs site only (available at http://localhost:3001)
+pnpm --filter docs dev
+
+# Build all packages
+pnpm build
+
+# Run tests
+pnpm test
 ```
 
-### Remote Caching
+## Contributing
 
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-Turborepo can use a technique known as [Remote Caching](https://turbo.build/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
+## License
 
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-```
-cd my-turborepo
-npx turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-```
-npx turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turbo.build/docs/core-concepts/monorepos/running-tasks)
-- [Caching](https://turbo.build/docs/core-concepts/caching)
-- [Remote Caching](https://turbo.build/docs/core-concepts/remote-caching)
-- [Filtering](https://turbo.build/docs/core-concepts/monorepos/filtering)
-- [Configuration Options](https://turbo.build/docs/reference/configuration)
-- [CLI Usage](https://turbo.build/docs/reference/command-line-reference)
+MIT © CrudKit

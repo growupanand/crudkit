@@ -1,0 +1,216 @@
+---
+title: "Advanced Usage"
+description: "Advanced patterns and techniques for using CrudKit."
+---
+
+# Advanced Usage
+
+This guide covers advanced usage of CrudKit, including customization, optimization, and handling complex scenarios.
+
+## Custom Validation with Zod
+
+You can enhance your schema with custom validation rules:
+
+```typescript
+// schema.ts
+import { pgTable, serial, text, timestamp, integer } from 'drizzle-orm/pg-core';
+import { generateSchemas } from 'crudkit';
+import { z } from 'zod';
+
+export const products = pgTable('products', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  price: integer('price').notNull(),
+  stock: integer('stock').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at'),
+});
+
+// Custom schema overrides
+export const productSchemas = generateSchemas({
+  table: products,
+  overrides: {
+    insert: {
+      name: z.string().min(3).max(100),
+      price: z.number().positive(),
+      stock: z.number().int().nonnegative(),
+    },
+    update: {
+      price: z.number().positive().optional(),
+    },
+  },
+});
+```
+
+## Working with Relationships
+
+Handling relationships between tables:
+
+```typescript
+// schema.ts
+import { pgTable, serial, text, timestamp, integer, uuid } from 'drizzle-orm/pg-core';
+import { relations } from 'drizzle-orm';
+
+export const categories = pgTable('categories', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+});
+
+export const products = pgTable('products', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  categoryId: integer('category_id').references(() => categories.id),
+});
+
+export const productsRelations = relations(products, ({ one }) => ({
+  category: one(categories, {
+    fields: [products.categoryId],
+    references: [categories.id],
+  }),
+}));
+```
+
+Then in your router:
+
+```typescript
+// api/routers/products.ts
+import { createTRPCRouter, publicProcedure } from '../trpc';
+import { generateRouter } from 'crudkit';
+import { db } from '../db';
+import { products } from '../schema';
+
+export const productsRouter = generateRouter(
+  {
+    table: products,
+    customProcedures: {
+      getWithCategory: publicProcedure
+        .input(z.object({ id: z.string() }))
+        .query(async ({ input, ctx }) => {
+          return await ctx.db.query.products.findFirst({
+            where: eq(products.id, input.id),
+            with: {
+              category: true,
+            },
+          });
+        }),
+    },
+  },
+  {
+    createTRPCRouter,
+    publicProcedure,
+    protectedProcedure,
+  }
+);
+```
+
+## Advanced React Query Patterns
+
+### Invalidating Queries
+
+```typescript
+import { useProducts } from '../hooks/use-products';
+
+export function DeleteProduct({ id }) {
+  const utils = trpc.useContext();
+  const { delete: deleteProduct, isLoading } = useProducts.useDelete();
+  
+  const handleDelete = async () => {
+    await deleteProduct({ id });
+    // Invalidate the getAll query to refresh the list
+    utils.products.getAll.invalidate();
+  };
+  
+  return (
+    <button onClick={handleDelete} disabled={isLoading}>
+      {isLoading ? 'Deleting...' : 'Delete'}
+    </button>
+  );
+}
+```
+
+### Optimistic Updates
+
+```typescript
+import { useProducts } from '../hooks/use-products';
+
+export function UpdateStock({ product }) {
+  const utils = trpc.useContext();
+  const { update, isLoading } = useProducts.useUpdate();
+  
+  const increaseStock = () => {
+    // Get current data
+    const previousData = utils.products.getById.getData({ id: product.id });
+    
+    // Optimistically update the UI
+    utils.products.getById.setData(
+      { id: product.id },
+      { ...previousData, stock: previousData.stock + 1 }
+    );
+    
+    // Send actual update to server
+    update({ 
+      id: product.id, 
+      stock: previousData.stock + 1 
+    }, {
+      // If it fails, revert to previous data
+      onError: () => {
+        utils.products.getById.setData({ id: product.id }, previousData);
+      }
+    });
+  };
+  
+  return (
+    <button onClick={increaseStock} disabled={isLoading}>
+      Increase Stock
+    </button>
+  );
+}
+```
+
+## Custom Error Handling
+
+```typescript
+import { generateRouter } from 'crudkit';
+import { TRPCError } from '@trpc/server';
+
+export const productsRouter = generateRouter(
+  {
+    table: products,
+    customProcedures: {
+      delete: protectedProcedure
+        .input(z.object({ id: z.string() }))
+        .mutation(async ({ input, ctx }) => {
+          // Check if the product exists
+          const product = await ctx.db.query.products.findFirst({
+            where: eq(products.id, input.id),
+          });
+          
+          if (!product) {
+            throw new TRPCError({
+              code: 'NOT_FOUND',
+              message: 'Product not found',
+            });
+          }
+          
+          // Check if the user has permission
+          if (product.userId !== ctx.user.id) {
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: 'You do not have permission to delete this product',
+            });
+          }
+          
+          // Proceed with delete
+          return await ctx.db.delete(products)
+            .where(eq(products.id, input.id))
+            .returning();
+        }),
+    },
+  },
+  helpers
+);
+```
+
+## Next Steps
+
+Now that you're familiar with advanced usage patterns, check out our [Examples](/examples/basic-crud) to see full implementations of CrudKit in action.

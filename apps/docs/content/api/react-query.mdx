@@ -1,0 +1,170 @@
+---
+title: "React Query Hooks"
+description: "Documentation for CrudKit's React Query hooks generation."
+---
+
+# React Query Hooks
+
+CrudKit provides a utility to generate React Query hooks for your tRPC routers, making it easy to use the CRUD operations in your React components.
+
+## `generateReactQueryHooks`
+
+The `generateReactQueryHooks` function creates a set of React Query hooks for a tRPC router.
+
+### Signature
+
+```typescript
+function generateReactQueryHooks<T extends Table>(
+  config: ReactQueryConfig<T>,
+  trpc: any
+): {
+  useCreate: () => CreateHookResult;
+  useGetAll: () => GetAllHookResult;
+  useGetById: (id: string) => GetByIdHookResult;
+  useUpdate: () => UpdateHookResult;
+  usePatch: () => PatchHookResult;
+  useDelete: () => DeleteHookResult;
+}
+```
+
+### Parameters
+
+- `config`: A configuration object with the following properties:
+  - `routerPath`: The path to the tRPC router (should match the table name)
+  
+- `trpc`: Your tRPC instance
+
+### Returns
+
+An object containing the following hooks:
+
+- `useCreate`: Hook for creating records
+- `useGetAll`: Hook for fetching all records
+- `useGetById`: Hook for fetching a record by ID
+- `useUpdate`: Hook for full updates
+- `usePatch`: Hook for partial updates
+- `useDelete`: Hook for deletions
+
+### Example
+
+```typescript
+import { generateReactQueryHooks } from 'crudkit';
+import { trpc } from '../utils/trpc';
+import { users } from '../schema';
+
+export const useUsers = generateReactQueryHooks(
+  {
+    routerPath: 'users',
+  },
+  trpc
+);
+```
+
+## Usage in Components
+
+Here's how to use the generated hooks in your React components:
+
+### Fetching Data
+
+```tsx
+import { useUsers } from '../hooks/use-users';
+
+function UsersList() {
+  const { data, isLoading, error } = useUsers.useGetAll();
+  
+  if (isLoading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error.message}</div>;
+  
+  return (
+    <ul>
+      {data?.map(user => (
+        <li key={user.id}>{user.name}</li>
+      ))}
+    </ul>
+  );
+}
+```
+
+### Creating Data
+
+```tsx
+import { useUsers } from '../hooks/use-users';
+
+function CreateUserForm() {
+  const { create, isLoading, error } = useUsers.useCreate();
+  
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    const formData = new FormData(event.target);
+    
+    create({
+      name: formData.get('name'),
+      email: formData.get('email'),
+    });
+  };
+  
+  return (
+    <form onSubmit={handleSubmit}>
+      <input name="name" placeholder="Name" />
+      <input name="email" placeholder="Email" />
+      <button type="submit" disabled={isLoading}>
+        {isLoading ? 'Creating...' : 'Create User'}
+      </button>
+      {error && <div>Error: {error.message}</div>}
+    </form>
+  );
+}
+```
+
+### Updating Data
+
+```tsx
+import { useUsers } from '../hooks/use-users';
+
+function UpdateUserForm({ user }) {
+  const { update, isLoading } = useUsers.useUpdate();
+  
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    const formData = new FormData(event.target);
+    
+    update({
+      id: user.id,
+      name: formData.get('name'),
+      email: formData.get('email'),
+    });
+  };
+  
+  return (
+    <form onSubmit={handleSubmit}>
+      <input name="name" defaultValue={user.name} />
+      <input name="email" defaultValue={user.email} />
+      <button type="submit" disabled={isLoading}>
+        {isLoading ? 'Updating...' : 'Update User'}
+      </button>
+    </form>
+  );
+}
+```
+
+### Deleting Data
+
+```tsx
+import { useUsers } from '../hooks/use-users';
+
+function DeleteUserButton({ userId }) {
+  const { delete: deleteUser, isLoading } = useUsers.useDelete();
+  
+  const handleDelete = () => {
+    if (confirm('Are you sure you want to delete this user?')) {
+      deleteUser({ id: userId });
+    }
+  };
+  
+  return (
+    <button onClick={handleDelete} disabled={isLoading}>
+      {isLoading ? 'Deleting...' : 'Delete User'}
+    </button>
+  );
+}
+```

@@ -1,0 +1,484 @@
+---
+title: "Basic CRUD Example"
+description: "A complete example of a CRUD application using CrudKit."
+---
+
+# Basic CRUD Example
+
+This example demonstrates a complete implementation of a CRUD application using CrudKit, Drizzle ORM, tRPC, and React Query.
+
+## Project Structure
+
+├── src/
+│ ├── db/
+│ │ ├── index.ts # Database connection
+│ │ └── schema.ts # Drizzle schema definition
+│ ├── server/
+│ │ ├── api/
+│ │ │ ├── routers/
+│ │ │ │ └── tasks.ts # Task router using CrudKit
+│ │ │ ├── root.ts # Root tRPC router
+│ │ │ └── trpc.ts # tRPC configuration
+│ ├── hooks/
+│ │ └── use-tasks.ts # React Query hooks using CrudKit
+│ └── components/
+│ ├── TaskList.tsx # List of tasks with CRUD operations
+│ └── TaskForm.tsx # Form for creating/editing tasks
+
+
+## Database Schema
+
+First, let's define our database schema using Drizzle:
+
+```typescript
+// src/db/schema.ts
+import { pgTable, serial, text, timestamp, boolean } from 'drizzle-orm/pg-core';
+
+export const tasks = pgTable('tasks', {
+  id: serial('id').primaryKey(),
+  title: text('title').notNull(),
+  description: text('description'),
+  completed: boolean('completed').default(false).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at'),
+});
+```
+
+## Database Connection
+
+```typescript
+// src/db/index.ts
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
+
+export const db = drizzle(pool);
+```
+
+## tRPC Setup
+
+```typescript
+// src/server/api/trpc.ts
+import { initTRPC, TRPCError } from '@trpc/server';
+import { type CreateNextContextOptions } from '@trpc/server/adapters/next';
+import { db } from '../../db';
+
+export const createTRPCContext = (opts: CreateNextContextOptions) => {
+  const { req, res } = opts;
+  
+  // Simple auth check on the server
+  const user = getUserFromRequest(req);
+  
+  return {
+    db,
+    user,
+    req,
+    res,
+  };
+};
+
+const t = initTRPC.context<typeof createTRPCContext>().create();
+
+export const createTRPCRouter = t.router;
+export const publicProcedure = t.procedure;
+
+// Protected procedure for authenticated routes
+export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
+  if (!ctx.user) {
+    throw new TRPCError({ code: 'UNAUTHORIZED' });
+  }
+  return next({
+    ctx: {
+      ...ctx,
+      user: ctx.user,
+    },
+  });
+});
+
+// Helper function to get user from request
+function getUserFromRequest(req) {
+  // This is a simplified example - implement your own auth logic
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return null;
+  
+  // Extract and verify token
+  try {
+    // Return user if authenticated
+    return { id: '1', name: 'Test User' };
+  } catch {
+    return null;
+  }
+}
+```
+
+## CrudKit Router Setup
+
+```typescript
+// src/server/api/routers/tasks.ts
+import { createTRPCRouter, publicProcedure, protectedProcedure } from '../trpc';
+import { generateRouter } from 'crudkit';
+import { tasks } from '../../../db/schema';
+
+export const tasksRouter = generateRouter(
+  {
+    table: tasks,
+    customProcedures: {
+      // Custom query example: get completed tasks count
+      getCompletedCount: publicProcedure.query(async ({ ctx }) => {
+        const result = await ctx.db
+          .select({ count: sql`count(*)` })
+          .from(tasks)
+          .where(eq(tasks.completed, true));
+        
+        return Number(result[0].count);
+      }),
+      
+      // Custom mutation example: mark all tasks as complete
+      markAllComplete: protectedProcedure.mutation(async ({ ctx }) => {
+        return await ctx.db
+          .update(tasks)
+          .set({ completed: true, updatedAt: new Date() })
+          .returning();
+      }),
+    },
+  },
+  {
+    createTRPCRouter,
+    publicProcedure,
+    protectedProcedure,
+  }
+);
+```
+
+## Root Router
+
+```typescript
+// src/server/api/root.ts
+import { createTRPCRouter } from './trpc';
+import { tasksRouter } from './routers/tasks';
+
+export const appRouter = createTRPCRouter({
+  tasks: tasksRouter,
+});
+
+export type AppRouter = typeof appRouter;
+```
+
+## React Query Hooks
+
+```typescript
+// src/hooks/use-tasks.ts
+import { generateReactQueryHooks } from 'crudkit';
+import { trpc } from '../utils/trpc';
+import { tasks } from '../db/schema';
+
+export const useTasks = generateReactQueryHooks(
+  {
+    routerPath: 'tasks',
+  },
+  trpc
+);
+```
+
+## Components
+
+### Task List Component
+
+```tsx
+// src/components/TaskList.tsx
+import { useState } from 'react';
+import { useTasks } from '../hooks/use-tasks';
+import { TaskForm } from './TaskForm';
+
+export function TaskList() {
+  const [editingTask, setEditingTask] = useState(null);
+  const { data: tasks, isLoading } = useTasks.useGetAll();
+  const { delete: deleteTask } = useTasks.useDelete();
+  const { update } = useTasks.useUpdate();
+  const utils = trpc.useContext();
+  
+  // Toggle task completion status
+  const handleToggleComplete = (task) => {
+    update({
+      id: task.id,
+      completed: !task.completed,
+    }, {
+      onSuccess: () => {
+        utils.tasks.getAll.invalidate();
+      }
+    });
+  };
+  
+  // Delete a task
+  const handleDelete = (id) => {
+    if (window.confirm('Are you sure you want to delete this task?')) {
+      deleteTask({ id }, {
+        onSuccess: () => {
+          utils.tasks.getAll.invalidate();
+        }
+      });
+    }
+  };
+  
+  if (isLoading) return <div>Loading tasks...</div>;
+  
+  return (
+    <div>
+      <h2>Tasks</h2>
+      
+      {editingTask ? (
+        <div>
+          <h3>Edit Task</h3>
+          <TaskForm 
+            task={editingTask} 
+            onCancel={() => setEditingTask(null)} 
+            onSuccess={() => {
+              setEditingTask(null);
+              utils.tasks.getAll.invalidate();
+            }}
+          />
+        </div>
+      ) : (
+        <TaskForm 
+          onSuccess={() => utils.tasks.getAll.invalidate()} 
+        />
+      )}
+      
+      <ul className="task-list">
+        {tasks?.map((task) => (
+          <li key={task.id} className={task.completed ? 'completed' : ''}>
+            <div className="task-header">
+              <input
+                type="checkbox"
+                checked={task.completed}
+                onChange={() => handleToggleComplete(task)}
+              />
+              <h3>{task.title}</h3>
+              <div className="actions">
+                <button onClick={() => setEditingTask(task)}>Edit</button>
+                <button onClick={() => handleDelete(task.id)}>Delete</button>
+              </div>
+            </div>
+            {task.description && (
+              <p className="task-description">{task.description}</p>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+```
+
+### Task Form Component
+
+```tsx
+// src/components/TaskForm.tsx
+import { useState } from 'react';
+import { useTasks } from '../hooks/use-tasks';
+
+export function TaskForm({ task, onSuccess, onCancel }) {
+  const [title, setTitle] = useState(task?.title || '');
+  const [description, setDescription] = useState(task?.description || '');
+  
+  const { create, isLoading: isCreating } = useTasks.useCreate();
+  const { update, isLoading: isUpdating } = useTasks.useUpdate();
+  
+  const isLoading = isCreating || isUpdating;
+  const isEditing = !!task;
+  
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    
+    if (isEditing) {
+      update({
+        id: task.id,
+        title,
+        description,
+        updatedAt: new Date(),
+      }, {
+        onSuccess,
+      });
+    } else {
+      create({
+        title,
+        description,
+      }, {
+        onSuccess: () => {
+          setTitle('');
+          setDescription('');
+          if (onSuccess) onSuccess();
+        },
+      });
+    }
+  };
+  
+  return (
+    <form onSubmit={handleSubmit} className="task-form">
+      <div className="form-row">
+        <label htmlFor="title">Title</label>
+        <input
+          id="title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          required
+          disabled={isLoading}
+        />
+      </div>
+      
+      <div className="form-row">
+        <label htmlFor="description">Description</label>
+        <textarea
+          id="description"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          disabled={isLoading}
+          rows={3}
+        />
+      </div>
+      
+      <div className="form-actions">
+        {isEditing && (
+          <button type="button" onClick={onCancel} disabled={isLoading}>
+            Cancel
+          </button>
+        )}
+        <button type="submit" disabled={isLoading}>
+          {isLoading
+            ? isEditing ? 'Updating...' : 'Creating...'
+            : isEditing ? 'Update Task' : 'Create Task'
+          }
+        </button>
+      </div>
+    </form>
+  );
+}
+```
+
+## Complete Page Component
+
+```tsx
+// src/pages/tasks.tsx
+import { TaskList } from '../components/TaskList';
+import { trpc } from '../utils/trpc';
+
+export default function TasksPage() {
+  const { data: completedCount } = trpc.tasks.getCompletedCount.useQuery();
+  const { mutate: markAllComplete, isLoading } = trpc.tasks.markAllComplete.useMutation({
+    onSuccess: () => {
+      utils.tasks.getAll.invalidate();
+      utils.tasks.getCompletedCount.invalidate();
+    }
+  });
+  const utils = trpc.useContext();
+  
+  return (
+    <div className="container">
+      <h1>Task Manager</h1>
+      
+      <div className="stats">
+        <p>Completed tasks: {completedCount || 0}</p>
+        <button 
+          onClick={() => markAllComplete()} 
+          disabled={isLoading}
+        >
+          {isLoading ? 'Updating...' : 'Mark All Complete'}
+        </button>
+      </div>
+      
+      <TaskList />
+    </div>
+  );
+}
+```
+
+## CSS Styling
+
+To complete the example, you could add some simple CSS styles:
+
+```css
+/* src/styles/tasks.css */
+.task-list {
+  list-style: none;
+  padding: 0;
+}
+
+.task-list li {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.task-list li.completed h3 {
+  text-decoration: line-through;
+  color: #888;
+}
+
+.task-header {
+  display: flex;
+  align-items: center;
+}
+
+.task-header h3 {
+  margin: 0 0 0 0.5rem;
+  flex: 1;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.task-description {
+  margin-top: 0.5rem;
+  margin-left: 1.5rem;
+  color: #666;
+}
+
+.task-form {
+  margin-bottom: 2rem;
+  padding: 1rem;
+  border: 1px solid #eee;
+  border-radius: 4px;
+}
+
+.form-row {
+  margin-bottom: 1rem;
+}
+
+.form-row label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-weight: 500;
+}
+
+.form-row input,
+.form-row textarea {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.stats {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding: 1rem;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+}
+```
+
+This example demonstrates a complete CRUD application using CrudKit. You can adapt it to your specific requirements and expand upon it as needed.
