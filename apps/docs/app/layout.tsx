@@ -9,10 +9,7 @@ export const metadata = {
 };
 
 const navbar = (
-  <Navbar
-    logo={<b>CRUDKit</b>}
-    // ... Your additional navbar options
-  />
+  <Navbar logo={<b>CRUDKit</b>} projectLink="https://github.com/growupanand/crudkit" />
 );
 const footer = <Footer>MIT {new Date().getFullYear()} © CRUDKit.</Footer>;
 
